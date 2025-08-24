@@ -1,112 +1,142 @@
 package org.example
 
-import java.time.LocalDate
-import java.time.temporal.ChronoUnit
+import java.util.Date
+import java.util.UUID
 
-// Part 2: Collections and HashMaps
+// Observer Pattern: An interface for classes that want to be notified of library events.
+interface LibraryObserver {
+    fun onLibraryEvent(message: String)
+}
+
+/**
+ * Manages the library's inventory and member records.
+ * Implements the Observer pattern to notify listeners of events.
+ */
 class Library {
-    private val itemsById = HashMap<String, LibraryItem>()
-    private val itemsByCategory = HashMap<String, MutableList<LibraryItem>>()
-    private val members = HashMap<String, Member>()
-    private val borrowedItems = HashMap<String, MutableMap<String, LocalDate>>() // memberId to {itemId: dueDate}
+    private val itemsById = mutableMapOf<String, LibraryItem>()
+    private val membersById = mutableMapOf<String, Member>()
+    private val borrowedItems = mutableMapOf<String, String>() // itemID -> memberID
+    private val transactions = mutableListOf<Transaction>()
+    private val observers = mutableSetOf<LibraryObserver>()
 
-    // Part 2.1: Library Inventory Management
+    // Performance Challenge: An index to quickly find books by author.
+    // This provides O(1) average time complexity for lookups,
+    // compared to a linear search which is O(n).
+    private val authorIndex = mutableMapOf<String, MutableList<Book>>()
+
+    /**
+     * Adds an observer to the library.
+     * @param observer The observer to add.
+     */
+    fun addObserver(observer: LibraryObserver) {
+        observers.add(observer)
+    }
+
+    /**
+     * Notifies all registered observers with a given message.
+     * @param message The message to send to observers.
+     */
+    private fun notifyObservers(message: String) {
+        observers.forEach { it.onLibraryEvent(message) }
+    }
+
+    /**
+     * Adds a new item to the library's inventory.
+     * @param item The item to add.
+     */
     fun addItem(item: LibraryItem) {
         itemsById[item.id] = item
-        itemsByCategory.getOrPut(item.getItemType()) { mutableListOf() }.add(item)
+        // Update the author index if the added item is a Book
+        if (item is Book) {
+            val books = authorIndex.getOrPut(item.author) { mutableListOf() }
+            books.add(item)
+        }
     }
 
+    /**
+     * Registers a new member with the library.
+     * @param member The member to register.
+     */
     fun registerMember(member: Member) {
-        members[member.getMemberId()] = member
+        membersById[member.getMemberId()] = member
     }
 
+    /**
+     * Allows a member to borrow an item.
+     * @param memberId The ID of the member.
+     * @param itemId The ID of the item.
+     */
     fun borrowItem(memberId: String, itemId: String) {
-        val member = members[memberId]
+        val member = membersById[memberId]
         val item = itemsById[itemId]
-
-        if (member != null && item != null && item.isAvailable) {
-            if (member.borrowItem(itemId)) {
-                item.isAvailable = false
-                val dueDate = LocalDate.now().plusDays(LibraryUtils.DEFAULT_BORROW_DAYS.toLong())
-                borrowedItems.getOrPut(memberId) { mutableMapOf() }[itemId] = dueDate
-                println("${item.title} borrowed by ${member.getName()}. Due on $dueDate")
-            } else {
-                println("Failed to borrow: Member has reached borrow limit.")
-            }
+        if (member == null || item == null) {
+            println("Error: Member or item not found.")
+            notifyObservers("Failed borrow attempt: member $memberId, item $itemId not found.")
+            return
+        }
+        if (item.isAvailable) {
+            item.isAvailable = false
+            borrowedItems[itemId] = memberId
+            val transaction = Transaction(UUID.randomUUID().toString(), memberId, itemId, Date(), TransactionType.BORROW)
+            transactions.add(transaction)
+            println("${item.title} borrowed by ${member.getName()}. Due on ${transaction.getDueDate()}")
+            notifyObservers("${item.title} borrowed by ${member.getName()}.")
         } else {
-            println("Failed to borrow: Member or item not found, or item is not available.")
+            println("Error: The item is currently unavailable.")
+            notifyObservers("${item.title} is currently unavailable for borrow.")
         }
     }
 
+    /**
+     * Allows a member to return an item.
+     * @param memberId The ID of the member.
+     * @param itemId The ID of the item.
+     */
     fun returnItem(memberId: String, itemId: String) {
-        val member = members[memberId]
         val item = itemsById[itemId]
-
-        if (member != null && item != null && !item.isAvailable) {
-            if (member.returnItem(itemId)) {
-                item.isAvailable = true
-                val borrowedItemInfo = borrowedItems[memberId]?.remove(itemId)
-                val daysLate = if (borrowedItemInfo != null) {
-                    val days = borrowedItemInfo.until(LocalDate.now()).days
-                    if (days > 0) days else 0
-                } else 0
-                val lateFee = item.calculateLateFee(daysLate)
-
-                println("${item.title} returned by ${member.getName()}. Days late: $daysLate. Late fee: $$lateFee")
-            } else {
-                println("Failed to return: Item was not borrowed by this member.")
-            }
-        } else {
-            println("Failed to return: Member or item not found, or item is not borrowed.")
+        if (item == null || borrowedItems[itemId] != memberId) {
+            println("Error: Cannot return item. Either item not found or not borrowed by this member.")
+            notifyObservers("Failed return attempt: item $itemId not borrowed by member $memberId.")
+            return
         }
+        item.isAvailable = true
+        borrowedItems.remove(itemId)
+        val transaction = Transaction(UUID.randomUUID().toString(), memberId, itemId, Date(), TransactionType.RETURN)
+        transactions.add(transaction)
+        println("${item.title} returned successfully.")
+        notifyObservers("${item.title} returned by member ${membersById[memberId]?.getName()}.")
     }
 
-    // Part 3.1: Higher-Order Functions and Lambdas
-    fun findBooksByAuthor(author: String): List<Book> {
-        return itemsByCategory["Book"]
-            ?.filterIsInstance<Book>()
-            ?.filter { it.author == author }
-            ?: emptyList()
+    /**
+     * Gets an item by its ID.
+     * @param id The ID of the item.
+     * @return The LibraryItem or null if not found.
+     */
+    fun getItemById(id: String): LibraryItem? = itemsById[id]
+
+    /**
+     * Gets a member by their ID.
+     * @param id The ID of the member.
+     * @return The Member or null if not found.
+     */
+    fun getMemberById(id: String): Member? = membersById[id]
+
+    /**
+     * Finds books by a specific author using a less efficient linear search.
+     * This is used for comparison with the optimized version.
+     * @param author The author's name to search for.
+     * @return A list of Books.
+     */
+    fun findBooksByAuthorLinear(author: String): List<Book> {
+        return itemsById.values.filterIsInstance<Book>().filter { it.author.equals(author, ignoreCase = true) }
     }
 
-    fun <T : LibraryItem> findItemsBy(
-        type: Class<T>,
-        predicate: (T) -> Boolean
-    ): List<T> {
-        return itemsById.values
-            .filterIsInstance(type)
-            .filter(predicate)
-    }
-
-    fun getLibraryStatistics(): Map<String, Any> {
-        val allItems = itemsById.values
-        val totalItemsByType = allItems.groupBy { it.getItemType() }.mapValues { it.value.size }
-        val availableCount = allItems.count { it.isAvailable }
-        val totalCount = allItems.size
-        val avgPages = allItems.filterIsInstance<Book>().map { it.pages }.average()
-        val mostPopularGenre = allItems.filterIsInstance<DVD>()
-            .groupBy { it.genre }
-            .maxByOrNull { it.value.size }
-            ?.key
-
-        return mapOf(
-            "totalItemsByType" to totalItemsByType,
-            "averageBookPages" to if (avgPages.isNaN()) 0.0 else avgPages,
-            "mostPopularDVDGenre" to (mostPopularGenre ?: "N/A"),
-            "percentageAvailable" to if (totalCount > 0) (availableCount.toDouble() / totalCount) * 100 else 0.0
-        )
-    }
-
-    fun processOverdueItems(action: (LibraryItem, Member, Int) -> Unit) {
-        borrowedItems.forEach { (memberId, borrowedItemsMap) ->
-            val member = members[memberId]
-            borrowedItemsMap.forEach { (itemId, dueDate) ->
-                val daysLate = ChronoUnit.DAYS.between(dueDate, LocalDate.now()).toInt()
-                val item = itemsById[itemId]
-                if (daysLate > 0 && member != null && item != null) {
-                    action(item, member, daysLate)
-                }
-            }
-        }
+    /**
+     * Performance Challenge: Finds books by a specific author using a pre-computed index.
+     * @param author The author's name to search for.
+     * @return A list of Books.
+     */
+    fun findBooksByAuthorOptimized(author: String): List<Book> {
+        return authorIndex[author]?.toList() ?: emptyList()
     }
 }

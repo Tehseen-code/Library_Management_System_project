@@ -1,65 +1,50 @@
 package org.example
 
-import java.time.LocalDate
-import java.time.temporal.ChronoUnit
-
-// Part 5.1: Sealed Class for Transaction Types
-sealed class TransactionType {
-    object Borrow : TransactionType()
-    object Return : TransactionType()
-    data class Renew(val newDueDate: LocalDate) : TransactionType()
+/**
+ * Abstract base class for all library items.
+ * @property id The unique ID of the item.
+ * @property title The title of the item.
+ * @property isAvailable The availability status of the item.
+ */
+abstract class LibraryItem(val id: String, val title: String, var isAvailable: Boolean = true) {
+    abstract fun getFormattedInfo(): String
+    abstract fun displayInfo()
 }
 
-// Part 1.1: Base Classes and Inheritance
-abstract class LibraryItem(
-    val id: String,
-    val title: String,
-    var isAvailable: Boolean = true
-) {
-    abstract fun getItemType(): String
-    abstract fun calculateLateFee(daysLate: Int): Double
-    open fun displayInfo(): String {
-        return "ID: $id, Title: $title, Available: $isAvailable"
+/**
+ * Represents a book in the library.
+ * @property author The author of the book.
+ * @property isbn The ISBN of the book.
+ * @property pages The number of pages in the book.
+ */
+class Book(id: String, title: String, val author: String, val isbn: String, val pages: Int) : LibraryItem(id, title) {
+    override fun getFormattedInfo(): String = "Title: $title, Author: $author, Type: Book, Available: $isAvailable"
+    override fun displayInfo() {
+        println("Book: $title by $author ($pages pages)")
     }
 }
 
-class Book(
-    id: String,
-    title: String,
-    val author: String,
-    val isbn: String,
-    val pages: Int
-) : LibraryItem(id, title) {
-    override fun getItemType(): String = "Book"
-    override fun calculateLateFee(daysLate: Int): Double = daysLate * 0.50
-    override fun displayInfo(): String {
-        return "${super.displayInfo()}, Author: $author, Pages: $pages"
+/**
+ * Represents a DVD in the library.
+ * @property director The director of the DVD.
+ * @property duration The duration in minutes.
+ * @property genre The genre of the DVD.
+ */
+class DVD(id: String, title: String, val director: String, val duration: Int, val genre: String) : LibraryItem(id, title) {
+    override fun getFormattedInfo(): String = "Title: $title, Director: $director, Type: DVD, Available: $isAvailable"
+    override fun displayInfo() {
+        println("DVD: $title directed by $director ($duration min)")
     }
 }
 
-class DVD(
-    id: String,
-    title: String,
-    val director: String,
-    val duration: Int, // in minutes
-    val genre: String
-) : LibraryItem(id, title) {
-    override fun getItemType(): String = "DVD"
-    override fun calculateLateFee(daysLate: Int): Double = daysLate * 1.00
-    override fun displayInfo(): String {
-        return "${super.displayInfo()}, Director: $director, Genre: $genre"
-    }
-}
-
-class Magazine(
-    id: String,
-    title: String,
-    val issueNumber: Int,
-    val publisher: String
-) : LibraryItem(id, title) {
-    override fun getItemType(): String = "Magazine"
-    override fun calculateLateFee(daysLate: Int): Double = daysLate * 0.25
-    override fun displayInfo(): String {
-        return "${super.displayInfo()}, Issue: $issueNumber, Publisher: $publisher"
+/**
+ * Represents a magazine in the library.
+ * @property issueNumber The issue number of the magazine.
+ * @property publisher The publisher of the magazine.
+ */
+class Magazine(id: String, title: String, val issueNumber: Int, val publisher: String) : LibraryItem(id, title) {
+    override fun getFormattedInfo(): String = "Title: $title, Issue: $issueNumber, Type: Magazine, Available: $isAvailable"
+    override fun displayInfo() {
+        println("Magazine: $title, Issue #$issueNumber, Publisher: $publisher")
     }
 }

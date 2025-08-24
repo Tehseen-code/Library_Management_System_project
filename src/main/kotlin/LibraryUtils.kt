@@ -1,52 +1,42 @@
 package org.example
 
-import java.time.LocalDate
-import java.time.temporal.ChronoUnit
+import java.text.SimpleDateFormat
+import java.util.*
+import kotlin.random.Random
 
-// Part 3.2: Extension Functions
-fun List<LibraryItem>.filterByAvailability(available: Boolean): List<LibraryItem> =
-    this.filter { it.isAvailable == available }
+/**
+ * A utility object containing helpful functions for the library system.
+ */
+object LibraryUtils {
+    /**
+     * Generates a unique ID for a library item or member.
+     * @param prefix The prefix for the ID (e.g., "Book", "Member").
+     * @return A unique ID string.
+     */
+    fun generateItemId(prefix: String): String {
+        return "${prefix.substring(0, 1).uppercase()}${Random.nextInt(1000, 9999)}"
+    }
 
-fun String.isValidEmail(): Boolean =
-    this.matches(Regex("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,6}"))
-
-fun LibraryItem.getFormattedInfo(): String {
-    return "Title: $title, Type: ${getItemType()}, Available: $isAvailable"
-}
-
-// Part 4.1: Recursive Functions
-fun calculateCompoundLateFee(baseFee: Double, days: Int): Double {
-    if (days <= 0) return baseFee
-    return calculateCompoundLateFee(baseFee * 1.05, days - 1)
-}
-
-fun <T : Comparable<T>> List<T>.recursiveBinarySearch(target: T, low: Int = 0, high: Int = size - 1): Int {
-    if (low > high) return -1
-    val mid = (low + high) / 2
-    return when {
-        this[mid] < target -> recursiveBinarySearch(target, mid + 1, high)
-        this[mid] > target -> recursiveBinarySearch(target, low, mid - 1)
-        else -> mid
+    /**
+     * Formats a date object into a readable string.
+     * @param date The Date object to format.
+     * @return A formatted date string.
+     */
+    fun formatDate(date: Date): String {
+        val formatter = SimpleDateFormat("yyyy-MM-dd")
+        return formatter.format(date)
     }
 }
 
-// Part 5.2: Companion Objects and Object Declarations
-class LibraryUtils {
-    companion object {
-        const val MAX_BORROW_LIMIT = 5
-        const val DEFAULT_BORROW_DAYS = 14
-        private var idCounter = 0
-
-        fun generateItemId(type: String): String {
-            val prefix = type.first().uppercase()
-            val number = String.format("%03d", ++idCounter)
-            return "$prefix$number"
-        }
+/**
+ * Calculates a compound late fee recursively.
+ * @param baseFee The initial late fee.
+ * @param daysLate The number of days late.
+ * @return The calculated compound fee.
+ */
+fun calculateCompoundLateFee(baseFee: Double, daysLate: Int): Double {
+    if (daysLate <= 0) {
+        return baseFee
     }
-}
-
-object LibraryConfig {
-    val categories = listOf("Fiction", "Non-Fiction", "Reference", "Periodicals")
-    val maxRenewalTimes = 2
-    val lateFeeCap = 50.0
+    return calculateCompoundLateFee(baseFee * 1.05, daysLate - 1)
 }
