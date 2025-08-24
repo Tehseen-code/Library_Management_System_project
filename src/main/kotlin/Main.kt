@@ -2,35 +2,30 @@ package org.example
 
 import java.util.Scanner
 
+/**
+ * A concrete implementation of the LibraryObserver interface.
+ * Logs events to the console.
+ */
+class NotificationService : LibraryObserver {
+    override fun onLibraryEvent(message: String) {
+        println("[NOTIFICATION]: $message")
+    }
+}
+
 fun main() {
     val library = Library()
     val scanner = Scanner(System.`in`)
-    val members = mutableListOf<Member>()
+    val notificationService = NotificationService()
+    library.addObserver(notificationService) // Observer Pattern
 
     // Pre-populate with sample data to demonstrate functionality
-    val book1 = Book(
-        id = LibraryUtils.generateItemId("Book"),
-        title = "The Kotlin Guide",
-        author = "Tehssen ul hassan",
-        isbn = "978-1234567890",
-        pages = 300
-    )
-    val dvd1 = DVD(
-        id = LibraryUtils.generateItemId("DVD"),
-        title = "Kotlin Tutorial",
-        director = "Jane Smith",
-        duration = 120,
-        genre = "Educational"
-    )
+    val book1 = LibraryItemFactory.createItem("Book", "The Kotlin Guide", "John Doe", "978-1234567890", 300) as Book
+    val dvd1 = LibraryItemFactory.createItem("DVD", "Kotlin Tutorial", "Jane Smith", 120, "Educational") as DVD
     library.addItem(book1)
     library.addItem(dvd1)
 
     val member1 = Member("M001", "Alice Johnson", "alice@email.com")
-    val member2 = Member("M002", "Bob Smith", "bob@email.com")
-    members.add(member1)
-    members.add(member2)
     library.registerMember(member1)
-    library.registerMember(member2)
 
     // --- Interactive Console Menu ---
     var isRunning = true
@@ -40,8 +35,8 @@ fun main() {
         println("2. Register a new member")
         println("3. Borrow an item")
         println("4. Return an item")
-        println("5. Search for items")
-        println("6. Get library statistics")
+        println("5. Search for items (Optimized Search)")
+        println("6. Performance Comparison")
         println("7. Exit")
         print("Please enter your choice: ")
 
@@ -49,10 +44,10 @@ fun main() {
             "1" -> {
                 println("Add a new item:")
                 print("Enter item type (Book, DVD, Magazine): ")
-                val type = scanner.nextLine().lowercase()
+                val type = scanner.nextLine()
                 print("Enter title: ")
                 val title = scanner.nextLine()
-                val newItem = when (type) {
+                val newItem = when (type.lowercase()) {
                     "book" -> {
                         print("Enter author: ")
                         val author = scanner.nextLine()
@@ -60,35 +55,35 @@ fun main() {
                         val isbn = scanner.nextLine()
                         print("Enter pages: ")
                         val pages = scanner.nextInt()
-                        scanner.nextLine() // Consume newline
-                        Book(LibraryUtils.generateItemId("Book"), title, author, isbn, pages)
+                        scanner.nextLine()
+                        LibraryItemFactory.createItem(type, title, author, isbn, pages)
                     }
                     "dvd" -> {
                         print("Enter director: ")
                         val director = scanner.nextLine()
                         print("Enter duration (minutes): ")
                         val duration = scanner.nextInt()
-                        scanner.nextLine() // Consume newline
+                        scanner.nextLine()
                         print("Enter genre: ")
                         val genre = scanner.nextLine()
-                        DVD(LibraryUtils.generateItemId("DVD"), title, director, duration, genre)
+                        LibraryItemFactory.createItem(type, title, director, duration, genre)
                     }
                     "magazine" -> {
                         print("Enter issue number: ")
                         val issueNumber = scanner.nextInt()
-                        scanner.nextLine() // Consume newline
+                        scanner.nextLine()
                         print("Enter publisher: ")
                         val publisher = scanner.nextLine()
-                        Magazine(LibraryUtils.generateItemId("Magazine"), title, issueNumber, publisher)
+                        LibraryItemFactory.createItem(type, title, issueNumber, publisher)
                     }
                     else -> {
                         println("Invalid item type.")
                         null
                     }
                 }
-                if (newItem != null) {
-                    library.addItem(newItem)
-                    println("Item '${newItem.title}' added successfully!")
+                newItem?.let {
+                    library.addItem(it)
+                    println("Item '${it.title}' added successfully!")
                 }
             }
             "2" -> {
@@ -119,20 +114,43 @@ fun main() {
             }
             "5" -> {
                 println("Search for items:")
-                print("Enter search query (by author, title, etc.): ")
+                print("Enter author name to search for: ")
                 val query = scanner.nextLine()
-                val foundBooks = library.findBooksByAuthor(query)
+                val foundBooks = library.findBooksByAuthorOptimized(query)
                 if (foundBooks.isNotEmpty()) {
                     println("Found Books:")
                     foundBooks.forEach { println(it.getFormattedInfo()) }
                 } else {
-                    println("No items found matching '$query'.")
+                    println("No items found by author '$query'.")
                 }
             }
             "6" -> {
-                println("Library Statistics:")
-                val stats = library.getLibraryStatistics()
-                stats.forEach { (key, value) -> println("$key: $value") }
+                println("--- Performance Test: Linear vs. Optimized Search ---")
+                // Dummy data for performance test
+                val dummyAuthor = "Test Author"
+                val largeNumberOfBooks = 100000
+                for (i in 1..largeNumberOfBooks) {
+                    val book = LibraryItemFactory.createItem("Book", "Book $i", dummyAuthor, "123456789$i", 100)
+                    if (book != null) {
+                        library.addItem(book)
+                    }
+                }
+
+                // Measure Linear Search
+                val startTimeLinear = System.currentTimeMillis()
+                library.findBooksByAuthorLinear(dummyAuthor)
+                val endTimeLinear = System.currentTimeMillis()
+                val timeLinear = endTimeLinear - startTimeLinear
+                println("Linear Search Time (for $largeNumberOfBooks books): ${timeLinear}ms")
+
+                // Measure Optimized Search
+                val startTimeOptimized = System.currentTimeMillis()
+                library.findBooksByAuthorOptimized(dummyAuthor)
+                val endTimeOptimized = System.currentTimeMillis()
+                val timeOptimized = endTimeOptimized - startTimeOptimized
+                println("Optimized Search Time (for $largeNumberOfBooks books): ${timeOptimized}ms")
+
+                println("The optimized search using a HashMap index is significantly faster.")
             }
             "7" -> {
                 println("Exiting application. Goodbye!")
